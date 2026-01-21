@@ -1,7 +1,11 @@
 import logging
 import time
-from colors import Colors # Assuming 'colors' library is installed (pip install ansicolors) or your custom Colors class
-from typing import Optional # Added for type hint consistency if needed elsewhere, though not strictly used in current args/returns
+from typing import (  # Added for type hint consistency if needed elsewhere, though not strictly used in current args/returns
+    Optional,
+)
+
+from colors import Colors  # Assuming 'colors' library is installed (pip install ansicolors) or your custom Colors class
+
 
 # --- Define Custom Formatter to handle time locally ---
 class CustomTimeFormatter(logging.Formatter):
@@ -34,6 +38,7 @@ class CustomTimeFormatter(logging.Formatter):
         # Format the time string as required
         s = time.strftime("%M:%S", now) + f".{cs:02d}"
         return s
+
 
 def setup_logging(level: int = logging.INFO) -> None:
     """

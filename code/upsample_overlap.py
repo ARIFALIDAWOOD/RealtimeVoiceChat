@@ -1,7 +1,9 @@
 import base64
+from typing import Optional
+
 import numpy as np
 from scipy.signal import resample_poly
-from typing import Optional
+
 
 class UpsampleOverlap:
     """
@@ -13,6 +15,7 @@ class UpsampleOverlap:
     returned as Base64 encoded strings. It maintains internal state to handle
     the overlap correctly across calls.
     """
+
     def __init__(self):
         """
         Initializes the UpsampleOverlap processor.
@@ -46,7 +49,7 @@ class UpsampleOverlap:
         audio_int16 = np.frombuffer(chunk, dtype=np.int16)
         # Handle potential empty chunks gracefully
         if audio_int16.size == 0:
-             return "" # Return empty string for empty input chunk
+            return ""  # Return empty string for empty input chunk
 
         audio_float = audio_int16.astype(np.float32) / 32768.0
 
@@ -66,8 +69,8 @@ class UpsampleOverlap:
             # Calculate lengths and indices for extracting the middle part
             # Ensure self.resampled_previous_chunk is not None (shouldn't happen here due to outer if)
             assert self.resampled_previous_chunk is not None
-            prev_len = len(self.resampled_previous_chunk) # Length of the *upsampled* previous chunk
-            h_prev = prev_len // 2 # Midpoint index of the *upsampled* previous chunk
+            prev_len = len(self.resampled_previous_chunk)  # Length of the *upsampled* previous chunk
+            h_prev = prev_len // 2  # Midpoint index of the *upsampled* previous chunk
 
             # *** CORRECTED INDEX CALCULATION (Reverted to original) ***
             # Calculate the end index for the part corresponding to the current chunk's main contribution
@@ -78,11 +81,13 @@ class UpsampleOverlap:
 
         # Update state for the next iteration
         self.previous_chunk = audio_float
-        self.resampled_previous_chunk = upsampled_current_chunk # Store the upsampled *current* chunk for the *next* overlap
+        self.resampled_previous_chunk = (
+            upsampled_current_chunk  # Store the upsampled *current* chunk for the *next* overlap
+        )
 
         # Convert the extracted part back to PCM16 bytes and encode
         pcm = (part * 32767).astype(np.int16).tobytes()
-        return base64.b64encode(pcm).decode('utf-8')
+        return base64.b64encode(pcm).decode("utf-8")
 
     def flush_base64_chunk(self) -> Optional[str]:
         """
@@ -106,5 +111,5 @@ class UpsampleOverlap:
             # Clear state after flushing
             self.previous_chunk = None
             self.resampled_previous_chunk = None
-            return base64.b64encode(pcm).decode('utf-8')
-        return None # Return None if there's nothing to flush
+            return base64.b64encode(pcm).decode("utf-8")
+        return None  # Return None if there's nothing to flush

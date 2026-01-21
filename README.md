@@ -15,6 +15,25 @@ https://github.com/user-attachments/assets/16cc29a7-bec2-4dd0-a056-d213db798d8f
 >
 > I will continue to review and merge high-quality, well-written Pull Requests from the community from time to time. Your contributions are welcome and appreciated!
 
+## Recent Updates 📝
+
+**Latest improvements (2025):**
+
+*   **✨ uv Package Manager Support:** The project now uses `uv` for faster and more reliable package management. The `install.bat` script has been updated to use `uv` for virtual environment creation and dependency installation.
+*   **🔧 OpenAI Configuration:** Full OpenAI backend support with environment variable configuration. Create a `.env` file in the `code/` directory with your `OPENAI_API_KEY` and optional `OPENAI_BASE_URL` (see Configuration section below).
+*   **🗣️ TTS Engine Update:** Default TTS engine switched from Coqui to **Kokoro** for better compatibility and reliability. Kokoro doesn't require DeepSpeed and works out of the box.
+*   **📦 Dependency Fixes:** 
+    *   Pinned `transformers==4.35.2` for compatibility with RealtimeTTS dependencies
+    *   Automatic spaCy model installation for Kokoro TTS (English model `en_core_web_sm`)
+    *   Fixed PyTorch version compatibility with DeepSpeed wheel (2.5.1+cu121)
+*   **🐛 Bug Fixes:**
+    *   Fixed Unicode encoding issues in model download messages
+    *   Enhanced error logging for better debugging
+    *   Improved LLM initialization error handling
+*   **📄 Configuration Files:**
+    *   Added `.env.example` template in `code/` directory for easy OpenAI setup
+    *   Environment variables now load from `code/.env` automatically
+
 ## What's Under the Hood?
 
 A sophisticated client-server system built for low-latency interaction:
@@ -33,8 +52,8 @@ A sophisticated client-server system built for low-latency interaction:
 *   **Real-Time Feedback:** See partial transcriptions and AI responses as they happen.
 *   **Low Latency Focus:** Optimized architecture using audio chunk streaming.
 *   **Smart Turn-Taking:** Dynamic silence detection (`turndetect.py`) adapts to the conversation pace.
-*   **Flexible AI Brains:** Pluggable LLM backends (Ollama default, OpenAI support via `llm_module.py`).
-*   **Customizable Voices:** Choose from different Text-to-Speech engines (Kokoro, Coqui, Orpheus via `audio_module.py`).
+*   **Flexible AI Brains:** Pluggable LLM backends (OpenAI default, Ollama support via `llm_module.py`).
+*   **Customizable Voices:** Choose from different Text-to-Speech engines (Kokoro default, Coqui, Orpheus via `audio_module.py`).
 *   **Web Interface:** Clean and simple UI using Vanilla JS and the Web Audio API.
 *   **Dockerized Deployment:** Recommended setup using Docker Compose for easier dependency management.
 
@@ -59,13 +78,14 @@ This project leverages powerful AI models, which have some requirements:
 *   **Operating System:**
     *   **Docker:** Linux is recommended for the best GPU integration with Docker.
     *   **Manual:** The provided script (`install.bat`) is for Windows. Manual steps are possible on Linux/macOS but may require more troubleshooting (especially for DeepSpeed).
-*   **🐍 Python:** 3.9 or higher (if setting up manually).
-*   **🚀 GPU:** **A powerful CUDA-enabled NVIDIA GPU is *highly recommended***, especially for faster STT (Whisper) and TTS (Coqui). Performance on CPU-only or weaker GPUs will be significantly slower.
-    *   The setup assumes **CUDA 12.1**. Adjust PyTorch installation if you have a different CUDA version.
+*   **🐍 Python:** **3.10 or higher** (required for `scipy==1.15.2` and other dependencies). Python 3.9 is no longer supported.
+*   **🚀 GPU:** **A powerful CUDA-enabled NVIDIA GPU is *highly recommended***, especially for faster STT (Whisper) and TTS (Kokoro/Coqui). Performance on CPU-only or weaker GPUs will be significantly slower.
+    *   The setup assumes **CUDA 12.1** (compatible with CUDA 13.0 drivers). Adjust PyTorch installation if you have a different CUDA version. The `install.bat` script handles PyTorch installation for the bundled DeepSpeed wheel.
     *   **Docker (Linux):** Requires [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html).
 *   **🐳 Docker (Optional but Recommended):** Docker Engine and Docker Compose v2+ for the containerized setup.
 *   **🧠 Ollama (Optional):** If using the Ollama backend *without* Docker, install it separately and pull your desired models. The Docker setup includes an Ollama service.
-*   **🔑 OpenAI API Key (Optional):** If using the OpenAI backend, set the `OPENAI_API_KEY` environment variable (e.g., in a `.env` file or passed to Docker).
+*   **🔑 OpenAI API Key (Required if using OpenAI):** If using the OpenAI backend (now the default), create a `.env` file in the `code/` directory with your `OPENAI_API_KEY`. See the Configuration section for details.
+*   **📦 uv Package Manager (Recommended for Manual Installation):** For Windows manual installation, the project now uses `uv` for faster package management. Install `uv` from [https://github.com/astral-sh/uv](https://github.com/astral-sh/uv) or let the `install.bat` script handle it.
 
 ---
 
@@ -131,15 +151,22 @@ This is the most straightforward method, bundling the application, dependencies,
 
 This method requires managing the Python environment yourself. It offers more direct control but can be trickier, especially regarding ML dependencies.
 
-**B1) Using the Windows Install Script:**
+**B1) Using the Windows Install Script (uv-based):**
 
-1.  Ensure you meet the prerequisites (Python, potentially CUDA drivers).
-2.  Run the script. It attempts to create a venv, install PyTorch for CUDA 12.1, a compatible DeepSpeed wheel, and other requirements.
+1.  Ensure you meet the prerequisites:
+    *   **Python 3.10+** (install from [python.org](https://www.python.org/) or via `uv python install 3.10`)
+    *   **uv package manager** (install from [https://github.com/astral-sh/uv](https://github.com/astral-sh/uv) or it will be installed automatically)
+    *   CUDA drivers (if using GPU)
+2.  Run the script. It uses `uv` to create a virtual environment, install PyTorch 2.5.1+cu121 (compatible with DeepSpeed wheel), a compatible DeepSpeed wheel, spaCy model for Kokoro TTS, and all other requirements.
     ```batch
     install.bat
     ```
-    *(This opens a new command prompt within the activated virtual environment.)*
-    Proceed to the **"Running the Application"** section.
+    *(This creates a `.venv` virtual environment and opens a new command prompt within it.)*
+3.  **Configure OpenAI (if using OpenAI backend):**
+    *   Copy `code/.env.example` to `code/.env`
+    *   Edit `code/.env` and add your OpenAI API key: `OPENAI_API_KEY=sk-your-key-here`
+    *   Optionally set `OPENAI_BASE_URL` for custom endpoints
+4.  Proceed to the **"Running the Application"** section.
 
 **B2) Manual Steps (Linux/macOS/Windows):**
 
@@ -178,7 +205,12 @@ This method requires managing the Python environment yourself. It offers more di
     ```bash
     pip install -r requirements.txt
     ```
-    *   **Note on DeepSpeed:** The `requirements.txt` may include DeepSpeed. Installation can be complex, especially on Windows. The `install.bat` tries a precompiled wheel. If manual installation fails, you might need to build it from source or consult resources like [deepspeedpatcher](https://github.com/erew123/deepspeedpatcher) (use at your own risk). Coqui TTS performance benefits most from DeepSpeed.
+    *   **Note on DeepSpeed:** The `requirements.txt` includes DeepSpeed. Installation can be complex, especially on Windows. The `install.bat` script uses a precompiled wheel compatible with PyTorch 2.5.1+cu121. If manual installation fails, you might need to build it from source or consult resources like [deepspeedpatcher](https://github.com/erew123/deepspeedpatcher) (use at your own risk). Coqui TTS performance benefits most from DeepSpeed, but Kokoro (the default engine) doesn't require it.
+6.  **Install spaCy Model for Kokoro TTS (if using Kokoro engine):**
+    ```bash
+    pip install https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1-py3-none-any.whl
+    ```
+    *   The `install.bat` script does this automatically.
 
 </details>
 
@@ -200,7 +232,11 @@ Your application is already running via `docker compose up -d`! Check logs using
     ```bash
     cd code
     ```
-3.  **Start the FastAPI server:**
+3.  **Configure OpenAI (if using OpenAI backend - now default):**
+    *   Copy `code/.env.example` to `code/.env`
+    *   Edit `code/.env` and add your OpenAI API key
+
+4.  **Start the FastAPI server:**
     ```bash
     python server.py
     ```
@@ -220,11 +256,21 @@ Want to tweak the AI's voice, brain, or how it listens? Modify the Python files 
 **⚠️ Important Docker Note:** If using Docker, make any configuration changes *before* running `docker compose build` to ensure they are included in the image.
 
 *   **TTS Engine & Voice (`server.py`, `audio_module.py`):**
-    *   Change `START_ENGINE` in `server.py` to `"coqui"`, `"kokoro"`, or `"orpheus"`.
+    *   Default engine is now **Kokoro** (no transformers dependency, works out of the box).
+    *   Change `TTS_START_ENGINE` in `server.py` to `"kokoro"`, `"coqui"`, or `"orpheus"`.
+    *   **Note:** Coqui engine currently has compatibility issues with transformers 4.35.2. Use Kokoro for best results.
     *   Adjust engine-specific settings (e.g., voice model path for Coqui, speaker ID for Orpheus, speed) within `AudioProcessor.__init__` in `audio_module.py`.
 *   **LLM Backend & Model (`server.py`, `llm_module.py`):**
-    *   Set `LLM_START_PROVIDER` (`"ollama"` or `"openai"`) and `LLM_START_MODEL` (e.g., `"hf.co/..."` for Ollama, model name for OpenAI) in `server.py`. Remember to pull the Ollama model if using Docker (see Installation Step A3).
-    *   Customize the AI's personality by editing `system_prompt.txt`.
+    *   Default backend is now **OpenAI**.
+    *   Set `LLM_START_PROVIDER` (`"openai"`, `"ollama"`, or `"lmstudio"`) and `LLM_START_MODEL` (e.g., `"gpt-4o-mini"` for OpenAI, `"hf.co/..."` for Ollama) in `server.py`.
+    *   **OpenAI Configuration:** Create a `.env` file in the `code/` directory:
+        ```
+        OPENAI_API_KEY=your-api-key-here
+        OPENAI_BASE_URL=  # Optional: leave empty for default, or set custom endpoint
+        ```
+        See `code/.env.example` for a template. The `.env` file is automatically loaded when the server starts.
+    *   Remember to pull the Ollama model if using Docker (see Installation Step A3).
+    *   Customize the AI's personality by editing `code/system_prompt.txt`.
 *   **STT Settings (`transcribe.py`):**
     *   Modify `DEFAULT_RECORDER_CONFIG` to change the Whisper model (`model`), language (`language`), silence thresholds (`silence_limit_seconds`), etc. The default `base.en` model is pre-downloaded during the Docker build.
 *   **Turn Detection Sensitivity (`turndetect.py`):**

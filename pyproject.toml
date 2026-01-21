@@ -1,0 +1,36 @@
+[tool.black]
+line-length = 120
+target-version = ['py310']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.venv
+  | venv
+  | build
+  | dist
+  | __pycache__
+  | code/static
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 120
+skip_glob = ["code/static/*"]
+
+[tool.flake8]
+max-line-length = 120
+extend-ignore = ["E203", "W503"]
+exclude = [
+    ".venv",
+    "venv",
+    "__pycache__",
+    "build",
+    "dist",
+    "code/static"
+]
+
+[tool.bandit]
+exclude_dirs = ["tests", "test", ".venv", "venv", "code/static"]
+skips = ["B101", "B601"]  # Skip assert_used and shell injection checks

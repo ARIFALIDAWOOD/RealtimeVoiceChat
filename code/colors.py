@@ -79,7 +79,7 @@ class Colors:
     def apply(cls, text: str) -> "Colors.Formatter":
         """
         Start a formatting chain for the given text.
-        
+
         Usage:
             print(Colors.apply("Hello").red.bold)
         """

@@ -1,8 +1,9 @@
 import logging
-from typing import Optional, Set, Tuple, Dict, Union # Added for type hinting
+from typing import Dict, Optional, Set, Tuple, Union  # Added for type hinting
 
 logger = logging.getLogger(__name__)
-from colors import Colors # Assuming this is needed externally
+from colors import Colors  # Assuming this is needed externally
+
 
 class TextContext:
     """
@@ -12,6 +13,7 @@ class TextContext:
     adhere to specified length constraints, and contain a minimum number
     of alphanumeric characters.
     """
+
     def __init__(self, split_tokens: Optional[Set[str]] = None) -> None:
         """
         Initializes the TextContext processor.
@@ -30,7 +32,9 @@ class TextContext:
         else:
             self.split_tokens: Set[str] = set(split_tokens)
 
-    def get_context(self, txt: str, min_len: int = 6, max_len: int = 120, min_alnum_count: int = 10) -> Tuple[Optional[str], Optional[str]]:
+    def get_context(
+        self, txt: str, min_len: int = 6, max_len: int = 120, min_alnum_count: int = 10
+    ) -> Tuple[Optional[str], Optional[str]]:
         """
         Finds the shortest valid context at the beginning of the input text.
 

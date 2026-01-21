@@ -1,0 +1,80 @@
+# Pre-commit hooks configuration
+# See https://pre-commit.com for more information
+
+repos:
+  # General file checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: ^(code/static/.*|.*\.json|.*\.md)
+      - id: end-of-file-fixer
+        exclude: ^(code/static/.*|.*\.json)
+      - id: check-yaml
+      - id: check-json
+      - id: check-added-large-files
+        args: ['--maxkb=10000']  # Warn on files > 10MB
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: detect-private-key
+      - id: mixed-line-ending
+        args: ['--fix=lf']
+
+  # Secret detection - scan for hardcoded credentials
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        args: ['--baseline', '.secrets.baseline']
+        exclude: |
+          (?x)^(
+            .*\.(json|md|txt|yaml|yml|bat|sh)$|
+            .*\.secrets\.baseline$|
+            code/static/.*|
+            .*\.example$
+            .*\.gitignore$
+          )$
+        additional_dependencies: ['pyyaml']
+
+  # Python code formatting
+  - repo: https://github.com/psf/black
+    rev: 24.1.1
+    hooks:
+      - id: black
+        language_version: python3.10
+        files: ^code/.*\.py$
+        exclude: ^code/static/
+
+  # Python linting
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.0.0
+    hooks:
+      - id: flake8
+        files: ^code/.*\.py$
+        exclude: ^code/static/
+        args: [
+          '--max-line-length=120',
+          '--extend-ignore=E203,W503,E402,F401,F841,F541,E722',  # Conflicts with Black, allow some warnings
+          '--exclude=.venv,venv,__pycache__,build,dist'
+        ]
+        additional_dependencies: ['flake8']
+
+  # Sort imports
+  - repo: https://github.com/PyCQA/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        files: ^code/.*\.py$
+        exclude: ^code/static/
+        args: ['--profile', 'black', '--line-length=120']
+
+  # Security checks
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.6
+    hooks:
+      - id: bandit
+        files: ^code/.*\.py$
+        exclude: ^code/static/
+        args: ['--skip', 'B101,B601']  # Skip assert_used and shell injection checks
+        pass_filenames: false
+        always_run: true
