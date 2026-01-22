@@ -880,7 +880,7 @@ class LLM:
             logger.debug(f"🤖✅ [{request_id}] Finished yielding {token_count} OpenAI/LMStudio tokens.")
             if full_response:
                 logger.info(
-                    f"🤖📝 [{request_id}] Complete LLM Response ({len(full_response)} chars): \"{full_response}\""
+                    f'🤖📝 [{request_id}] Complete LLM Response ({len(full_response)} chars): "{full_response}"'
                 )
         except APIConnectionError as e:
             # Often happens if the stream is closed prematurely by cancellation
@@ -1041,7 +1041,7 @@ class LLM:
             )
             if full_response:
                 logger.info(
-                    f"🤖📝 [{request_id}] Complete LLM Response ({len(full_response)} chars): \"{full_response}\""
+                    f'🤖📝 [{request_id}] Complete LLM Response ({len(full_response)} chars): "{full_response}"'
                 )
 
         except requests.exceptions.ChunkedEncodingError as e:
