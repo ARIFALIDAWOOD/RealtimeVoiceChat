@@ -16,6 +16,9 @@
       --bubble-assistant-text: #333333; /* Dark gray text for assistant bubble */
       --bg: #f4f4f4;                    /* Very light gray page background */
       --shadow: 0 2px 8px rgba(0,0,0,0.15);
+      --accent: #3498db;                /* Accent blue */
+      --danger: #c04949;                /* Danger red */
+      --success: #27ae60;               /* Success green */
     }
     html, body {
       height: 100%;
@@ -31,6 +34,9 @@
       display: flex;
       flex-direction: column;
     }
+    .hidden {
+      display: none !important;
+    }
     #app {
       flex: 1;
       display: flex;
@@ -40,7 +46,7 @@
     }
     .chat-container {
       flex: 1;
-      max-width: 480px;
+      max-width: 520px;
       width: 100%;
       background: #fff;
       box-shadow: var(--shadow);
@@ -53,21 +59,108 @@
     .header {
       background: var(--primary);
       color: #fff;
-      padding: 18px 24px;
-      font-size: 1.25rem;
-      letter-spacing: 1px;
+      padding: 14px 16px;
+      font-size: 1.1rem;
+      letter-spacing: 0.5px;
       font-weight: 500;
       border-top-left-radius: 16px;
       border-top-right-radius: 16px;
       display: flex;
       align-items: center;
       gap: 8px;
+      flex-wrap: wrap;
     }
-    .status {
-      font-size: 0.9rem;
-      color: #c0c0c0;
+    .header-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .header-right {
       margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 12px;
     }
+
+    /* Session indicator */
+    .session-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.75rem;
+      background: rgba(255,255,255,0.1);
+      padding: 4px 8px;
+      border-radius: 4px;
+    }
+    .session-indicator .session-id {
+      color: rgba(255,255,255,0.8);
+      max-width: 80px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .connection-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #999;
+    }
+    .connection-dot.connected {
+      background: var(--success);
+    }
+    .connection-dot.disconnected {
+      background: #999;
+    }
+
+    /* User status */
+    .user-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.8rem;
+    }
+    .user-email {
+      color: rgba(255,255,255,0.9);
+      max-width: 120px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .guest-indicator {
+      color: rgba(255,255,255,0.7);
+      font-size: 0.75rem;
+    }
+    .logout-btn {
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.3);
+      color: #fff;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      cursor: pointer;
+    }
+    .logout-btn:hover {
+      background: rgba(255,255,255,0.1);
+    }
+    .login-btn {
+      background: var(--accent);
+      border: none;
+      color: #fff;
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      cursor: pointer;
+    }
+    .login-btn:hover {
+      background: #2980b9;
+    }
+
+    .status {
+      font-size: 0.85rem;
+      color: #c0c0c0;
+    }
+
+    /* Messages */
     .messages {
       flex: 1;
       padding: 20px 16px 16px 16px;
@@ -102,7 +195,6 @@
       border-bottom-left-radius: 4px;
       margin-right: auto;
     }
-    /* Updated typing bubble to a simpler, lighter color */
     .bubble.typing {
       background: #ebedef;
       color: #444;
@@ -117,61 +209,230 @@
       50% { opacity: 1; }
       100% { opacity: 0.8; }
     }
+
+    /* Input bar */
     .input-bar {
       display: flex;
-      flex-wrap: wrap;
+      flex-direction: column;
       padding: 12px;
       background: #fff;
       border-top: 1px solid #e1e5ef;
-      align-items: flex-start;
       gap: 12px;
-      justify-content: space-between;
     }
-    .input-bar button {
-      appearance: none;
-      outline: none;
-      border: none;
-      padding: 8px 14px;
+
+    /* Session panel */
+    .session-section {
+      border-bottom: 1px solid #e1e5ef;
+      padding-bottom: 10px;
+      margin-bottom: 2px;
+    }
+    .section-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      padding: 4px 0;
+    }
+    .section-toggle-label {
+      font-size: 0.75rem;
+      color: #666;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .section-toggle-arrow {
+      font-size: 0.65rem;
+      color: #999;
+      transition: transform 0.2s;
+    }
+    .section-toggle.expanded .section-toggle-arrow {
+      transform: rotate(180deg);
+    }
+    .session-panel {
+      margin-top: 8px;
+    }
+    .session-actions-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .new-session-btn {
+      flex: 1;
+      padding: 6px 12px;
       background: var(--primary);
       color: #fff;
-      font-size: 0.9rem;
-      border-radius: 7px;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.8rem;
       cursor: pointer;
-      font-weight: 500;
-      transition: background 0.2s;
-      flex: 0 0 auto;
-      white-space: nowrap;
     }
-    .input-bar button:active {
+    .new-session-btn:hover {
       background: #203a4a;
     }
-    .input-bar button:disabled {
-      background: #a0a0a0;
-      cursor: default;
+    .session-list {
+      max-height: 120px;
+      overflow-y: auto;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
     }
-    @media (max-width: 600px) {
-      .chat-container {
-        margin: 0;
-        border-radius: 0;
-        max-width: 100vw;
-      }
-      .header {
-        border-radius: 0;
-      }
-      .input-bar {
-        flex-direction: column;
-        align-items: stretch;
-      }
-      .control-group,
-      .verbosity-control,
-      .speed-control {
-        max-width: 100%;
-        width: 100%;
-      }
-      .input-bar button {
-        flex: 1 1 auto;
-        min-width: 0;
-      }
+    .session-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 10px;
+      border-bottom: 1px solid #f0f0f0;
+      font-size: 0.8rem;
+    }
+    .session-item:last-child {
+      border-bottom: none;
+    }
+    .session-item.active {
+      background: #e8f4f8;
+    }
+    .session-item.empty,
+    .session-item.loading {
+      color: #888;
+      text-align: center;
+      justify-content: center;
+    }
+    .session-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .session-name {
+      font-weight: 500;
+      color: #333;
+    }
+    .session-date {
+      font-size: 0.7rem;
+      color: #888;
+    }
+    .session-actions {
+      display: flex;
+      gap: 4px;
+    }
+    .session-load {
+      padding: 3px 8px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      cursor: pointer;
+    }
+    .session-delete {
+      padding: 3px 8px;
+      background: var(--danger);
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      cursor: pointer;
+    }
+
+    /* Config section */
+    .config-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: flex-start;
+    }
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 100px;
+      min-width: 90px;
+      max-width: 140px;
+    }
+    .control-group label {
+      font-size: 0.75rem;
+      color: #666;
+      margin-bottom: 4px;
+      font-weight: 500;
+    }
+    .control-group select {
+      padding: 6px 8px;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      background: #fff;
+      font-size: 0.85rem;
+      color: #333;
+      cursor: pointer;
+      outline: none;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .control-group select:hover {
+      border-color: var(--primary);
+    }
+    .control-group select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(44, 62, 80, 0.1);
+    }
+
+    /* Slider controls */
+    .slider-control {
+      flex: 1 1 120px;
+      min-width: 110px;
+      max-width: 150px;
+    }
+    .slider-control label {
+      font-size: 0.75rem;
+      color: #666;
+      margin-bottom: 4px;
+      display: block;
+      font-weight: 500;
+    }
+    .slider-control input[type="range"] {
+      width: 100%;
+      height: 4px;
+      background: #e0e0e0;
+      border-radius: 2px;
+      outline: none;
+      -webkit-appearance: none;
+    }
+    .slider-control input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      background: var(--primary);
+      border-radius: 50%;
+      cursor: pointer;
+    }
+    .slider-labels {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 4px;
+      font-size: 0.65rem;
+      color: #888;
+    }
+
+    /* Advanced config section */
+    .advanced-config {
+      border-top: 1px solid #e1e5ef;
+      padding-top: 10px;
+      margin-top: 2px;
+    }
+    .config-content {
+      margin-top: 8px;
+    }
+    .config-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+      gap: 10px;
+    }
+    .config-grid .control-group {
+      max-width: none;
+    }
+
+    /* Button row */
+    .button-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      justify-content: center;
     }
     .btn {
       display: inline-flex;
@@ -187,198 +448,363 @@
       color: white;
       transition: all 0.2s ease;
     }
-
     .btn svg {
       margin: 0;
     }
-
     .start-btn {
       background-color: #2a3543;
     }
-
     .stop-btn {
-      background-color: #c04949;
+      background-color: var(--danger);
     }
-
     .reset-btn {
       background-color: #0d65d0;
     }
-
+    .copy-btn {
+      background-color: #6c757d;
+    }
     .btn:hover {
       opacity: 0.9;
     }
-
     .btn:active {
       transform: scale(0.98);
-    }    
-    .speed-control {
-      flex: 0 1 auto;
-      min-width: 120px;
-      max-width: 150px;
     }
-    #speedSlider {
-      width: 100%;
-      height: 4px;
-      background: #e0e0e0;
-      border-radius: 2px;
-      outline: none;
-      -webkit-appearance: none;
+
+    /* Auth Modal */
+    .auth-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
     }
-    #speedSlider::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      width: 16px;
-      height: 16px;
-      background: #2c3e50;
-      border-radius: 50%;
-      cursor: pointer;
-    }
-    .speed-labels {
+    .auth-modal.visible {
       display: flex;
-      justify-content: space-between;
-      margin-top: 4px;
-      font-size: 0.7rem;
-      color: #666;
-      white-space: nowrap;
     }
-    .control-group {
+    .auth-container {
+      background: #fff;
+      border-radius: 12px;
+      padding: 24px;
+      width: 320px;
+      max-width: 90vw;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    }
+    .auth-header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .auth-header h2 {
+      margin: 0;
+      font-size: 1.25rem;
+      color: var(--primary);
+    }
+    .auth-tabs {
+      display: flex;
+      border-bottom: 1px solid #e0e0e0;
+      margin-bottom: 16px;
+    }
+    .auth-tab {
+      flex: 1;
+      padding: 10px;
+      background: none;
+      border: none;
+      font-size: 0.9rem;
+      color: #666;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+    }
+    .auth-tab.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+    }
+    .auth-tab:hover {
+      color: var(--primary);
+    }
+    .auth-form {
       display: flex;
       flex-direction: column;
-      flex: 0 1 auto;
-      min-width: 100px;
-      max-width: 140px;
+      gap: 12px;
     }
-    .control-group label {
-      font-size: 0.75rem;
-      color: #666;
-      margin-bottom: 4px;
-      font-weight: 500;
-    }
-    #personaSelect {
-      padding: 6px 8px;
-      border: 1px solid #e0e0e0;
+    .auth-form input {
+      padding: 10px 12px;
+      border: 1px solid #ddd;
       border-radius: 6px;
-      background: #fff;
-      font-size: 0.85rem;
-      color: #333;
-      cursor: pointer;
+      font-size: 0.9rem;
+    }
+    .auth-form input:focus {
       outline: none;
-      width: 100%;
-      box-sizing: border-box;
+      border-color: var(--primary);
     }
-    #personaSelect:hover {
-      border-color: #2c3e50;
-    }
-    #personaSelect:focus {
-      border-color: #2c3e50;
-      box-shadow: 0 0 0 2px rgba(44, 62, 80, 0.1);
-    }
-    .verbosity-control {
-      flex: 0 1 auto;
-      min-width: 120px;
-      max-width: 150px;
-    }
-    #verbositySlider {
-      width: 100%;
-      height: 4px;
-      background: #e0e0e0;
-      border-radius: 2px;
-      outline: none;
-      -webkit-appearance: none;
-    }
-    #verbositySlider::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      width: 16px;
-      height: 16px;
-      background: #2c3e50;
-      border-radius: 50%;
+    .auth-form button[type="submit"] {
+      padding: 10px;
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.9rem;
       cursor: pointer;
     }
-    .verbosity-labels {
+    .auth-form button[type="submit"]:hover {
+      background: #203a4a;
+    }
+    .auth-error {
+      color: var(--danger);
+      font-size: 0.8rem;
+      text-align: center;
+      min-height: 20px;
+    }
+    .auth-divider {
       display: flex;
-      justify-content: space-between;
-      margin-top: 4px;
-      font-size: 0.7rem;
+      align-items: center;
+      margin: 16px 0;
+      color: #999;
+      font-size: 0.8rem;
+    }
+    .auth-divider::before,
+    .auth-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: #e0e0e0;
+    }
+    .auth-divider span {
+      padding: 0 10px;
+    }
+    .guest-btn {
+      width: 100%;
+      padding: 10px;
+      background: #f5f5f5;
       color: #666;
-      white-space: nowrap;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+    .guest-btn:hover {
+      background: #eee;
+    }
+
+    /* Responsive */
+    @media (max-width: 600px) {
+      .chat-container {
+        margin: 0;
+        border-radius: 0;
+        max-width: 100vw;
+      }
+      .header {
+        border-radius: 0;
+        padding: 12px;
+      }
+      .header-title {
+        font-size: 0.95rem;
+      }
+      .config-row {
+        flex-direction: column;
+      }
+      .control-group,
+      .slider-control {
+        max-width: 100%;
+        width: 100%;
+      }
+      .button-row {
+        flex-direction: column;
+      }
+      .btn {
+        flex: 1;
+      }
     }
   </style>
 </head>
 <body>
+  <!-- Auth Modal -->
+  <div class="auth-modal" id="authModal">
+    <div class="auth-container">
+      <div class="auth-header">
+        <h2>Voice Chat</h2>
+      </div>
+      <div class="auth-tabs">
+        <button class="auth-tab active" id="loginTab">Login</button>
+        <button class="auth-tab" id="registerTab">Register</button>
+      </div>
+      <form id="loginForm" class="auth-form">
+        <input type="email" id="loginEmail" placeholder="Email" required>
+        <input type="password" id="loginPassword" placeholder="Password" required>
+        <button type="submit">Login</button>
+      </form>
+      <form id="registerForm" class="auth-form hidden">
+        <input type="email" id="registerEmail" placeholder="Email" required>
+        <input type="password" id="registerPassword" placeholder="Password (min 8 chars)" required minlength="8">
+        <input type="password" id="registerConfirmPassword" placeholder="Confirm Password" required minlength="8">
+        <button type="submit">Register</button>
+      </form>
+      <div class="auth-error" id="authError"></div>
+      <div class="auth-divider"><span>or</span></div>
+      <button class="guest-btn" id="guestBtn">Continue as Guest</button>
+    </div>
+  </div>
+
   <div id="app">
     <div class="chat-container">
+      <!-- Header -->
       <div class="header">
-        <!-- Centered “AI” text within the circle -->
-        <svg height="24" width="24" viewBox="0 0 22 22" fill="#fff" style="margin-right:8px">
-          <circle cx="11" cy="11" r="12" fill="#222F3D" />
-          <text
-            x="50%"
-            y="50%"
-            fill="#fff"
-            text-anchor="middle"
-            alignment-baseline="middle"
-            font-size="12"
-            font-family="Inter"
-          >AI</text>
-        </svg>
-        Real-Time Voice Chat
-        <span class="status" id="status"></span>
-      </div>
-      <div class="messages" id="messages"></div>
-      <div class="input-bar">
-        <div class="control-group">
-          <label for="personaSelect">Persona</label>
-          <select id="personaSelect">
-            <option value="default">Default</option>
-            <option value="math_teacher">Math Teacher</option>
-          </select>
-        </div>
-
-        <div class="verbosity-control">
-          <label for="verbositySlider" style="font-size: 0.75rem; color: #666; margin-bottom: 4px; display: block; font-weight: 500;">Verbosity</label>
-          <input type="range" id="verbositySlider" min="0" max="2" value="1" step="1">
-          <div class="verbosity-labels">
-            <span>Brief</span>
-            <span>Normal</span>
-            <span>Detailed</span>
-          </div>
-        </div>
-
-        <div class="speed-control">
-          <label for="speedSlider" style="font-size: 0.75rem; color: #666; margin-bottom: 4px; display: block; font-weight: 500;">Speed</label>
-          <input type="range" id="speedSlider" min="0" max="100" value="100">
-          <div class="speed-labels">
-            <span>Fast</span>
-            <span>Slow</span>
-          </div>
-        </div>
-
-        <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;">
-          <button id="startBtn" title="Start voice chat" class="btn start-btn">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M8 5L8 19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            <path d="M8 5L18 12L8 19" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <div class="header-title">
+          <svg height="24" width="24" viewBox="0 0 22 22" fill="#fff">
+            <circle cx="11" cy="11" r="12" fill="#222F3D" />
+            <text x="50%" y="50%" fill="#fff" text-anchor="middle" alignment-baseline="middle" font-size="12" font-family="Inter">AI</text>
           </svg>
+          <span>Voice Chat</span>
+        </div>
+        <div class="header-right">
+          <div class="session-indicator" id="sessionIndicator">
+            <span class="session-id" id="currentSessionId">No session</span>
+            <span class="connection-dot disconnected" id="connectionDot" title="Disconnected"></span>
+          </div>
+          <div class="user-status" id="userStatus">
+            <span class="user-email" id="userEmail"></span>
+            <span class="guest-indicator" id="guestIndicator">Guest</span>
+            <button class="logout-btn" id="logoutBtn" style="display: none;">Logout</button>
+          </div>
+          <span class="status" id="status"></span>
+        </div>
+      </div>
+
+      <!-- Messages -->
+      <div class="messages" id="messages"></div>
+
+      <!-- Input Bar -->
+      <div class="input-bar">
+        <!-- Session Panel -->
+        <div class="session-section">
+          <div class="section-toggle" id="sessionToggle">
+            <span class="section-toggle-label">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              </svg>
+              Sessions
+            </span>
+            <span class="section-toggle-arrow">▼</span>
+          </div>
+          <div class="session-panel hidden" id="sessionPanel">
+            <div class="session-actions-row">
+              <button class="new-session-btn" id="newSessionBtn">+ New Session</button>
+            </div>
+            <div class="session-list" id="sessionList">
+              <div class="session-item empty">Login to save sessions</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Basic Config -->
+        <div class="config-row">
+          <div class="control-group">
+            <label for="personaSelect">Persona</label>
+            <select id="personaSelect">
+              <option value="default">Default</option>
+            </select>
+          </div>
+
+          <div class="slider-control">
+            <label for="verbositySlider">Verbosity</label>
+            <input type="range" id="verbositySlider" min="0" max="2" value="1" step="1">
+            <div class="slider-labels">
+              <span>Brief</span>
+              <span>Normal</span>
+              <span>Detailed</span>
+            </div>
+          </div>
+
+          <div class="slider-control">
+            <label for="speedSlider">Speed</label>
+            <input type="range" id="speedSlider" min="0" max="100" value="100">
+            <div class="slider-labels">
+              <span>Fast</span>
+              <span>Slow</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Advanced Config -->
+        <div class="advanced-config">
+          <div class="section-toggle" id="configToggle">
+            <span class="section-toggle-label">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M12 1v6m0 6v10M4.22 4.22l4.24 4.24m7.08 7.08l4.24 4.24M1 12h6m6 0h10M4.22 19.78l4.24-4.24m7.08-7.08l4.24-4.24"/>
+              </svg>
+              Advanced Settings
+            </span>
+            <span class="section-toggle-arrow">▼</span>
+          </div>
+          <div class="config-content hidden" id="configContent">
+            <div class="config-grid">
+              <div class="control-group">
+                <label for="llmProviderSelect">LLM Provider</label>
+                <select id="llmProviderSelect">
+                  <option value="openai">OpenAI</option>
+                </select>
+              </div>
+              <div class="control-group">
+                <label for="llmModelSelect">Model</label>
+                <select id="llmModelSelect">
+                  <option value="gpt-4o-mini">gpt-4o-mini</option>
+                </select>
+              </div>
+              <div class="control-group">
+                <label for="ttsEngineSelect">TTS Engine</label>
+                <select id="ttsEngineSelect">
+                  <option value="kokoro">Kokoro</option>
+                </select>
+              </div>
+              <div class="control-group">
+                <label for="ttsVoiceSelect">Voice</label>
+                <select id="ttsVoiceSelect">
+                  <option value="af_heart">af_heart</option>
+                </select>
+              </div>
+              <div class="control-group">
+                <label for="languageSelect">Language</label>
+                <select id="languageSelect">
+                  <option value="en">English</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="button-row">
+          <button id="startBtn" title="Start voice chat" class="btn start-btn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M8 5L8 19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <path d="M8 5L18 12L8 19" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
           </button>
-          
+
           <button id="stopBtn" title="Stop voice chat" class="btn stop-btn">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <rect x="6" y="6" width="12" height="12" rx="1" stroke="currentColor" stroke-width="2"/>
             </svg>
           </button>
-          
+
           <button id="clearBtn" title="Reset conversation" class="btn reset-btn">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C14.8273 3 17.35 4.30367 19 6.34267" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
               <path d="M14.5 6.5L19.5 6.5L19.5 1.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
-          </button> 
+          </button>
 
           <button id="copyBtn" title="Copy conversation" class="btn copy-btn">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-             <rect x="9" y="9" width="11" height="11" rx="1" stroke="currentColor" stroke-width="2"/>
-             <path d="M5 15H4C3.44772 15 3 14.5523 3 14V4C3 3.44772 3.44772 3 4 3H14C14.5523 3 15 3.44772 15 4V5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-           </svg>
-         </button>
+              <rect x="9" y="9" width="11" height="11" rx="1" stroke="currentColor" stroke-width="2"/>
+              <path d="M5 15H4C3.44772 15 3 14.5523 3 14V4C3 3.44772 3.44772 3 4 3H14C14.5523 3 15 3.44772 15 4V5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </button>
         </div>
       </div>
     </div>
