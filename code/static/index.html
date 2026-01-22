@@ -119,25 +119,28 @@
     }
     .input-bar {
       display: flex;
-      padding: 12px 12px;
+      flex-wrap: wrap;
+      padding: 12px;
       background: #fff;
       border-top: 1px solid #e1e5ef;
-      align-items: center;
-      gap: 8px;
+      align-items: flex-start;
+      gap: 12px;
+      justify-content: space-between;
     }
     .input-bar button {
       appearance: none;
       outline: none;
       border: none;
-      padding: 8px 18px;
+      padding: 8px 14px;
       background: var(--primary);
       color: #fff;
-      font-size: 1rem;
+      font-size: 0.9rem;
       border-radius: 7px;
       cursor: pointer;
       font-weight: 500;
       transition: background 0.2s;
-      margin-left: 4px;
+      flex: 0 0 auto;
+      white-space: nowrap;
     }
     .input-bar button:active {
       background: #203a4a;
@@ -154,6 +157,20 @@
       }
       .header {
         border-radius: 0;
+      }
+      .input-bar {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .control-group,
+      .verbosity-control,
+      .speed-control {
+        max-width: 100%;
+        width: 100%;
+      }
+      .input-bar button {
+        flex: 1 1 auto;
+        min-width: 0;
       }
     }
     .btn {
@@ -195,9 +212,9 @@
       transform: scale(0.98);
     }    
     .speed-control {
-      flex: 1;
-      margin: 0 16px;
-      max-width: 200px;
+      flex: 0 1 auto;
+      min-width: 120px;
+      max-width: 150px;
     }
     #speedSlider {
       width: 100%;
@@ -219,8 +236,70 @@
       display: flex;
       justify-content: space-between;
       margin-top: 4px;
-      font-size: 0.8rem;
+      font-size: 0.7rem;
       color: #666;
+      white-space: nowrap;
+    }
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      flex: 0 1 auto;
+      min-width: 100px;
+      max-width: 140px;
+    }
+    .control-group label {
+      font-size: 0.75rem;
+      color: #666;
+      margin-bottom: 4px;
+      font-weight: 500;
+    }
+    #personaSelect {
+      padding: 6px 8px;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      background: #fff;
+      font-size: 0.85rem;
+      color: #333;
+      cursor: pointer;
+      outline: none;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    #personaSelect:hover {
+      border-color: #2c3e50;
+    }
+    #personaSelect:focus {
+      border-color: #2c3e50;
+      box-shadow: 0 0 0 2px rgba(44, 62, 80, 0.1);
+    }
+    .verbosity-control {
+      flex: 0 1 auto;
+      min-width: 120px;
+      max-width: 150px;
+    }
+    #verbositySlider {
+      width: 100%;
+      height: 4px;
+      background: #e0e0e0;
+      border-radius: 2px;
+      outline: none;
+      -webkit-appearance: none;
+    }
+    #verbositySlider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      background: #2c3e50;
+      border-radius: 50%;
+      cursor: pointer;
+    }
+    .verbosity-labels {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 4px;
+      font-size: 0.7rem;
+      color: #666;
+      white-space: nowrap;
     }
   </style>
 </head>
@@ -246,44 +325,61 @@
       </div>
       <div class="messages" id="messages"></div>
       <div class="input-bar">
+        <div class="control-group">
+          <label for="personaSelect">Persona</label>
+          <select id="personaSelect">
+            <option value="default">Default</option>
+            <option value="math_teacher">Math Teacher</option>
+          </select>
+        </div>
+
+        <div class="verbosity-control">
+          <label for="verbositySlider" style="font-size: 0.75rem; color: #666; margin-bottom: 4px; display: block; font-weight: 500;">Verbosity</label>
+          <input type="range" id="verbositySlider" min="0" max="2" value="1" step="1">
+          <div class="verbosity-labels">
+            <span>Brief</span>
+            <span>Normal</span>
+            <span>Detailed</span>
+          </div>
+        </div>
 
         <div class="speed-control">
-          <input type="range" id="speedSlider" min="0" max="100" value="0">
+          <label for="speedSlider" style="font-size: 0.75rem; color: #666; margin-bottom: 4px; display: block; font-weight: 500;">Speed</label>
+          <input type="range" id="speedSlider" min="0" max="100" value="100">
           <div class="speed-labels">
             <span>Fast</span>
             <span>Slow</span>
           </div>
         </div>
 
-        <br>
-
-        <button id="startBtn" title="Start voice chat" class="btn start-btn">
+        <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;">
+          <button id="startBtn" title="Start voice chat" class="btn start-btn">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M8 5L8 19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
             <path d="M8 5L18 12L8 19" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
-        </button>
-        
-        <button id="stopBtn" title="Stop voice chat" class="btn stop-btn">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect x="6" y="6" width="12" height="12" rx="1" stroke="currentColor" stroke-width="2"/>
-          </svg>
-        </button>
-        
-        <button id="clearBtn" title="Reset conversation" class="btn reset-btn">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C14.8273 3 17.35 4.30367 19 6.34267" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            <path d="M14.5 6.5L19.5 6.5L19.5 1.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </button> 
+          </button>
+          
+          <button id="stopBtn" title="Stop voice chat" class="btn stop-btn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="6" y="6" width="12" height="12" rx="1" stroke="currentColor" stroke-width="2"/>
+            </svg>
+          </button>
+          
+          <button id="clearBtn" title="Reset conversation" class="btn reset-btn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C14.8273 3 17.35 4.30367 19 6.34267" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <path d="M14.5 6.5L19.5 6.5L19.5 1.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button> 
 
-        <button id="copyBtn" title="Copy conversation" class="btn copy-btn">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-           <rect x="9" y="9" width="11" height="11" rx="1" stroke="currentColor" stroke-width="2"/>
-           <path d="M5 15H4C3.44772 15 3 14.5523 3 14V4C3 3.44772 3.44772 3 4 3H14C14.5523 3 15 3.44772 15 4V5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-         </svg>
-       </button>
-
+          <button id="copyBtn" title="Copy conversation" class="btn copy-btn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+             <rect x="9" y="9" width="11" height="11" rx="1" stroke="currentColor" stroke-width="2"/>
+             <path d="M5 15H4C3.44772 15 3 14.5523 3 14V4C3 3.44772 3.44772 3 4 3H14C14.5523 3 15 3.44772 15 4V5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+           </svg>
+         </button>
+        </div>
       </div>
     </div>
   </div>

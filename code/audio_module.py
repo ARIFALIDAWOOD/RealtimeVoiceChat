@@ -451,7 +451,7 @@ class AudioProcessor:
 
         # Note: Chunk counting removed - queue size tracking should be done at the consumer level
         logger.info(
-            f"👄✅ {generation_string} Quick answer synthesis complete. Text: {text[:50]}... (queued {total_chunks_queued} chunks)"
+            f"👄✅ {generation_string} Quick answer synthesis complete. Text: {text[:50]}... (received {chunks_received_count} chunks)"
         )
         return True  # Indicate successful completion
 

@@ -287,7 +287,20 @@ class LLM:
         self.system_prompt_message = None
         if self.system_prompt:
             self.system_prompt_message = {"role": "system", "content": self.system_prompt}
-            logger.info(f"🤖💬 System prompt set.")
+
+    def update_system_prompt(self, new_prompt: str):
+        """
+        Updates the system prompt dynamically.
+
+        Args:
+            new_prompt: The new system prompt text to use.
+        """
+        self.system_prompt = new_prompt
+        if new_prompt:
+            self.system_prompt_message = {"role": "system", "content": new_prompt}
+        else:
+            self.system_prompt_message = None
+        logger.info(f"🤖⚙️ System prompt updated. New prompt length: {len(new_prompt) if new_prompt else 0} characters")
 
     def _lazy_initialize_clients(self) -> bool:
         """

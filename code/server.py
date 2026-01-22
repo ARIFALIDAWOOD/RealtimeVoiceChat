@@ -333,6 +333,11 @@ async def process_incoming_data(
                     if turn_detection:
                         turn_detection.update_settings(speed_factor)
                         logger.info(f"🖥️⚙️ Updated turn detection settings to factor: {speed_factor:.2f}")
+                elif msg_type == "set_system_prompt":
+                    persona = data.get("persona", "default")
+                    verbosity = data.get("verbosity", "normal")
+                    logger.info(f"🖥️⚙️ Received set_system_prompt: persona='{persona}', verbosity='{verbosity}'")
+                    app.state.SpeechPipelineManager.update_system_prompt(persona, verbosity)
 
     except asyncio.CancelledError:
         pass  # Task cancellation is expected on disconnect

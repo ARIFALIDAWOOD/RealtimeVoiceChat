@@ -16,7 +16,12 @@
 const statusDiv = document.getElementById("status");
 const messagesDiv = document.getElementById("messages");
 const speedSlider = document.getElementById("speedSlider");
-speedSlider.disabled = true;  // start disabled
+// Speed slider is enabled by default - values will be queued until connection is ready
+const personaSelect = document.getElementById("personaSelect");
+const verbositySlider = document.getElementById("verbositySlider");
+
+// Verbosity mapping: 0 = brief, 1 = normal, 2 = detailed
+const verbosityMap = ["brief", "normal", "detailed"];
 
 let socket = null;
 let audioContext = null;
@@ -281,15 +286,76 @@ document.getElementById("clearBtn").onclick = () => {
   }
 };
 
-speedSlider.addEventListener("input", (e) => {
-  const speedValue = parseInt(e.target.value);
+let pendingSpeedValue = null;
+
+if (speedSlider) {
+  speedSlider.addEventListener("input", (e) => {
+    const speedValue = parseInt(e.target.value);
+    console.log("Speed setting changed to:", speedValue);
+    
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({
+        type: 'set_speed',
+        speed: speedValue
+      }));
+      pendingSpeedValue = null; // Clear pending if sent successfully
+    } else {
+      // Queue the value if socket isn't ready
+      pendingSpeedValue = speedValue;
+      console.log("Speed value queued (socket not ready):", speedValue);
+    }
+  });
+}
+
+// System prompt and verbosity controls
+let pendingSystemPromptUpdate = null;
+
+function sendSystemPromptUpdate(clearHistory = false) {
+  const persona = personaSelect.value;
+  const verbosityIndex = parseInt(verbositySlider.value);
+  const verbosity = verbosityMap[verbosityIndex];
+  
   if (socket && socket.readyState === WebSocket.OPEN) {
+    // Send system prompt update immediately
     socket.send(JSON.stringify({
-      type: 'set_speed',
-      speed: speedValue
+      type: 'set_system_prompt',
+      persona: persona,
+      verbosity: verbosity
     }));
+    console.log(`System prompt updated: persona=${persona}, verbosity=${verbosity}`);
+    
+    // Clear history if persona changed (to ensure clean context)
+    if (clearHistory) {
+      chatHistory = [];
+      typingUser = typingAssistant = "";
+      renderMessages();
+      socket.send(JSON.stringify({ type: 'clear_history' }));
+      console.log("Conversation history cleared due to persona change");
+    }
+  } else {
+    // Queue the update if socket isn't ready
+    pendingSystemPromptUpdate = { persona, verbosity, clearHistory };
+    console.log(`System prompt update queued: persona=${persona}, verbosity=${verbosity}`);
   }
-  console.log("Speed setting changed to:", speedValue);
+}
+
+// Persona change handler - clears history to ensure clean context
+personaSelect.addEventListener("change", () => {
+  const oldPersona = personaSelect.dataset.lastValue || "default";
+  const newPersona = personaSelect.value;
+  personaSelect.dataset.lastValue = newPersona;
+  
+  // Clear history when persona changes to ensure the new persona starts fresh
+  sendSystemPromptUpdate(clearHistory = true);
+  
+  // Visual feedback
+  const personaName = personaSelect.options[personaSelect.selectedIndex].text;
+  console.log(`Persona changed from "${oldPersona}" to "${newPersona}" (${personaName})`);
+});
+
+// Verbosity change handler - doesn't clear history
+verbositySlider.addEventListener("input", () => {
+  sendSystemPromptUpdate(clearHistory = false);
 });
 
 document.getElementById("startBtn").onclick = async () => {
@@ -306,7 +372,51 @@ document.getElementById("startBtn").onclick = async () => {
     statusDiv.textContent = "Connected. Activating mic and TTS…";
     await startRawPcmCapture();
     await setupTTSPlayback();
-    speedSlider.disabled = false; 
+    // Speed slider is always enabled - no need to enable it here
+    
+    // Initialize persona tracking
+    if (!personaSelect.dataset.lastValue) {
+      personaSelect.dataset.lastValue = personaSelect.value;
+    }
+    
+    // Send initial system prompt settings
+    sendSystemPromptUpdate(clearHistory = false);
+    
+    // Send any pending speed value that was queued before connection
+    if (pendingSpeedValue !== null) {
+      socket.send(JSON.stringify({
+        type: 'set_speed',
+        speed: pendingSpeedValue
+      }));
+      console.log("Pending speed value applied:", pendingSpeedValue);
+      pendingSpeedValue = null;
+    } else if (speedSlider) {
+      // Send current speed slider value on connection (always send, even if 0)
+      const currentSpeed = parseInt(speedSlider.value);
+      socket.send(JSON.stringify({
+        type: 'set_speed',
+        speed: currentSpeed
+      }));
+      console.log("Initial speed value sent:", currentSpeed);
+    }
+    
+    // Send any pending update that was queued before connection
+    if (pendingSystemPromptUpdate) {
+      const { persona, verbosity, clearHistory } = pendingSystemPromptUpdate;
+      socket.send(JSON.stringify({
+        type: 'set_system_prompt',
+        persona: persona,
+        verbosity: verbosity
+      }));
+      if (clearHistory) {
+        chatHistory = [];
+        typingUser = typingAssistant = "";
+        renderMessages();
+        socket.send(JSON.stringify({ type: 'clear_history' }));
+      }
+      pendingSystemPromptUpdate = null;
+      console.log("Pending system prompt update applied");
+    }
   };
 
   socket.onmessage = (evt) => {
@@ -324,14 +434,14 @@ document.getElementById("startBtn").onclick = async () => {
     statusDiv.textContent = "Connection closed.";
     flushRemainder();
     cleanupAudio();
-    speedSlider.disabled = true;
+    // Keep speed slider enabled - values will be queued until reconnected
   };
 
   socket.onerror = (err) => {
     statusDiv.textContent = "Connection error.";
     cleanupAudio();
     console.error(err);
-    speedSlider.disabled = true; 
+    // Keep speed slider enabled - values will be queued until reconnected
   };
 };
 

@@ -1,11 +1,12 @@
 # speech_pipeline_manager.py
+import json
 import logging
 import os
 import sys
 import threading
 import time
 from queue import Empty, Queue
-from typing import Callable, Optional
+from typing import Callable, Optional, Dict, Any
 
 # (Make sure real/mock imports are correct)
 from audio_module import AudioProcessor
@@ -17,14 +18,54 @@ from text_similarity import TextSimilarity
 # (Logging setup)
 logger = logging.getLogger(__name__)
 
-# (Load system prompt)
-try:
-    with open("system_prompt.txt", "r", encoding="utf-8") as f:
-        system_prompt = f.read().strip()
-    logger.info("🗣️📄 System prompt loaded from file.")
-except FileNotFoundError:
-    logger.warning("🗣️📄 system_prompt.txt not found. Using default system prompt.")
-    system_prompt = "You are a helpful assistant."
+# (Load system prompts config)
+def load_system_prompts_config() -> Dict[str, Any]:
+    """
+    Loads system prompts configuration from JSON file.
+    
+    Returns:
+        Dictionary containing personas and verbosity_levels, or default config if file not found.
+    """
+    try:
+        with open("system_prompts.json", "r", encoding="utf-8") as f:
+            config = json.load(f)
+        logger.info("🗣️📄 System prompts config loaded from system_prompts.json")
+        return config
+    except FileNotFoundError:
+        logger.warning("🗣️📄 system_prompts.json not found. Using default config.")
+        # Return minimal default config
+        return {
+            "personas": {
+                "default": {
+                    "name": "Default",
+                    "base_prompt": "You are a helpful assistant."
+                }
+            },
+            "verbosity_levels": {
+                "normal": {
+                    "name": "Normal",
+                    "instruction": "Provide balanced responses."
+                }
+            }
+        }
+    except json.JSONDecodeError as e:
+        logger.error(f"🗣️💥 Error parsing system_prompts.json: {e}. Using default config.")
+        return {
+            "personas": {
+                "default": {
+                    "name": "Default",
+                    "base_prompt": "You are a helpful assistant."
+                }
+            },
+            "verbosity_levels": {
+                "normal": {
+                    "name": "Normal",
+                    "instruction": "Provide balanced responses."
+                }
+            }
+        }
+
+SYSTEM_PROMPTS_CONFIG = load_system_prompts_config()
 
 
 USE_ORPHEUS_UNCENSORED = False
@@ -152,7 +193,13 @@ class SpeechPipelineManager:
         self.no_think = no_think
         self.orpheus_model = orpheus_model
 
-        self.system_prompt = system_prompt
+        # Initialize system prompt configuration
+        self.current_persona = "default"
+        self.current_verbosity = "normal"
+        self.system_prompts_config = SYSTEM_PROMPTS_CONFIG
+        
+        # Build initial system prompt
+        self.system_prompt = self._build_system_prompt(self.current_persona, self.current_verbosity)
         if tts_engine == "orpheus":
             self.system_prompt += f"\n{orpheus_prompt_addon}"
 
@@ -247,6 +294,81 @@ class SpeechPipelineManager:
         )
 
         logger.info("🗣️🚀 SpeechPipelineManager initialized and workers started.")
+
+    def _build_system_prompt(self, persona: str, verbosity: str) -> str:
+        """
+        Builds a system prompt by combining persona base prompt and verbosity instruction.
+        
+        Args:
+            persona: The persona key (e.g., "default", "math_teacher")
+            verbosity: The verbosity level key (e.g., "brief", "normal", "detailed")
+            
+        Returns:
+            Combined system prompt string.
+        """
+        # Get persona base prompt
+        personas = self.system_prompts_config.get("personas", {})
+        persona_config = personas.get(persona, personas.get("default", {}))
+        base_prompt = persona_config.get("base_prompt", "You are a helpful assistant.")
+        
+        # Get verbosity instruction
+        verbosity_levels = self.system_prompts_config.get("verbosity_levels", {})
+        verbosity_config = verbosity_levels.get(verbosity, verbosity_levels.get("normal", {}))
+        verbosity_instruction = verbosity_config.get("instruction", "")
+        
+        # Combine them
+        if verbosity_instruction:
+            combined_prompt = f"{base_prompt}\n\n**Response Style:**\n{verbosity_instruction}"
+        else:
+            combined_prompt = base_prompt
+            
+        return combined_prompt
+
+    def update_system_prompt(self, persona: str, verbosity: str):
+        """
+        Updates the system prompt dynamically by changing persona and/or verbosity.
+        
+        Args:
+            persona: The persona key to use (e.g., "default", "math_teacher")
+            verbosity: The verbosity level key (e.g., "brief", "normal", "detailed")
+        """
+        # Validate persona and verbosity exist in config
+        personas = self.system_prompts_config.get("personas", {})
+        verbosity_levels = self.system_prompts_config.get("verbosity_levels", {})
+        
+        if persona not in personas:
+            logger.warning(f"🗣️⚠️ Unknown persona '{persona}', using 'default'")
+            persona = "default"
+            
+        if verbosity not in verbosity_levels:
+            logger.warning(f"🗣️⚠️ Unknown verbosity '{verbosity}', using 'normal'")
+            verbosity = "normal"
+        
+        # Update current settings
+        self.current_persona = persona
+        self.current_verbosity = verbosity
+        
+        # Build new system prompt
+        new_prompt = self._build_system_prompt(persona, verbosity)
+        
+        # Add orpheus addon if needed
+        if self.tts_engine == "orpheus":
+            new_prompt += f"\n{orpheus_prompt_addon}"
+        
+        # Update the system prompt
+        self.system_prompt = new_prompt
+        
+        # Update the LLM's system prompt
+        self.llm.update_system_prompt(new_prompt)
+        
+        # Abort any ongoing generation to ensure new persona takes effect immediately
+        if self.is_valid_gen():
+            logger.info(f"🗣️🛑 Aborting ongoing generation to apply new persona/verbosity settings")
+            self.abort_generation(wait_for_completion=False, timeout=2.0, reason="System prompt update")
+        
+        persona_name = personas.get(persona, {}).get("name", persona)
+        verbosity_name = verbosity_levels.get(verbosity, {}).get("name", verbosity)
+        logger.info(f"🗣️📝 System prompt updated: Persona='{persona_name}', Verbosity='{verbosity_name}'")
 
     def is_valid_gen(self) -> bool:
         """
