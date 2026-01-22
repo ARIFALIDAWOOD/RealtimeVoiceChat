@@ -404,6 +404,7 @@ class SpeechPipelineManager:
 
             gen_id = current_gen.id
             logger.info(f"🗣️🧠🔄 [Gen {gen_id}] LLM Worker: Processing generation...")
+            logger.info(f"🗣️🧠📋 [Gen {gen_id}] LLM Worker: Provider: {self.llm_provider}, Model: {self.llm_model}")
 
             # Set state for active generation
             self.llm_generation_active = True
@@ -921,7 +922,7 @@ class SpeechPipelineManager:
 
         try:
             logger.info(f"🗣️🧠🚀 [Gen {new_gen_id}] Calling LLM generate...")
-            logger.debug(f"🗣️🧠📋 [Gen {new_gen_id}] LLM backend: {self.llm_provider}, model: {self.llm_model}")
+            logger.info(f"🗣️🧠📋 [Gen {new_gen_id}] Using provider: {self.llm_provider}, model: {self.llm_model}")
             logger.debug(f"🗣️🧠📋 [Gen {new_gen_id}] History length: {len(self.history)} messages")
             # TODO: Update history management if needed
             # self.history.append({"role": "user", "content": txt}) # Example history update

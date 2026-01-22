@@ -707,6 +707,7 @@ class LLM:
 
         req_id = request_id if request_id else f"{self.backend}-{uuid.uuid4()}"
         logger.info(f"🤖💬 Starting generation (Request ID: {req_id})")
+        logger.info(f"🤖💬 Using provider: {self.backend}, model: {self.model}")
 
         messages = []
         if use_system_prompt and self.system_prompt_message:
