@@ -1,0 +1,23 @@
+Generic single-database configuration with async SQLAlchemy support.
+
+Usage:
+------
+
+# Generate a new migration after model changes:
+cd code
+alembic revision --autogenerate -m "Description of changes"
+
+# Apply all pending migrations:
+alembic upgrade head
+
+# Downgrade one revision:
+alembic downgrade -1
+
+# Show current revision:
+alembic current
+
+# Show migration history:
+alembic history
+
+Note: The database URL is configured via the DATABASE_URL environment variable.
+If not set, it defaults to SQLite at ./voicechat.db
