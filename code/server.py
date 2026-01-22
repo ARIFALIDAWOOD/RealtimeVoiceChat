@@ -1,4 +1,15 @@
 # server.py
+import warnings
+
+# Suppress FutureWarning from transformers using deprecated PyTorch pytree API
+# This is a known issue in transformers 4.35.2 (pinned for TTS compatibility)
+warnings.filterwarnings(
+    "ignore",
+    message=r".*_register_pytree_node.*is deprecated.*",
+    category=FutureWarning,
+    module=r"transformers\.utils\.generic",
+)
+
 import logging
 from queue import Empty, Queue
 

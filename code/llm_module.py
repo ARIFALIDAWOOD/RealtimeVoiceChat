@@ -859,6 +859,7 @@ class LLM:
             Exception: For other unexpected errors during streaming.
         """
         token_count = 0
+        full_response = ""  # Accumulate complete response for logging
         try:
             for chunk in stream:
                 # Check for cancellation *before* processing chunk
@@ -874,8 +875,13 @@ class LLM:
                     content = delta.content
                     if content:
                         token_count += 1
+                        full_response += content  # Accumulate for logging
                         yield content
             logger.debug(f"🤖✅ [{request_id}] Finished yielding {token_count} OpenAI/LMStudio tokens.")
+            if full_response:
+                logger.info(
+                    f"🤖📝 [{request_id}] Complete LLM Response ({len(full_response)} chars): \"{full_response}\""
+                )
         except APIConnectionError as e:
             # Often happens if the stream is closed prematurely by cancellation
             is_cancelled = False
@@ -936,6 +942,7 @@ class LLM:
         """
         token_count = 0
         buffer = ""
+        full_response = ""  # Accumulate complete response for logging
         processed_done = False  # Flag to track if 'done' message was processed
         try:
             # --- Start Change ---
@@ -969,6 +976,7 @@ class LLM:
                             content = chunk.get("message", {}).get("content")
                             if content:
                                 token_count += 1
+                                full_response += content  # Accumulate for logging
                                 yield content
                             if chunk.get("done"):
                                 logger.debug(f"🤖✅ [{request_id}] Ollama signalled 'done'.")
@@ -1031,6 +1039,10 @@ class LLM:
             logger.debug(
                 f"🤖✅ [{request_id}] Finished yielding {token_count} Ollama tokens (processed_done={processed_done})."
             )
+            if full_response:
+                logger.info(
+                    f"🤖📝 [{request_id}] Complete LLM Response ({len(full_response)} chars): \"{full_response}\""
+                )
 
         except requests.exceptions.ChunkedEncodingError as e:
             # This can happen if the connection is closed prematurely (e.g., by cancellation)

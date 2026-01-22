@@ -569,8 +569,8 @@ class SpeechPipelineManager:
                             current_gen.quick_answer_overhang = overhang
                             current_gen.quick_answer_provided = True
                             self.llm_answer_ready_event.set()  # Signal TTS quick worker
-                            break
-                            # Do NOT break here, continue iterating to finish the full LLM response
+                            # Do NOT break here - continue iterating to finish the full LLM response
+                            # The quick_answer will be used for TTS, but we need to capture the complete response
 
                 if not iterator_started:
                     logger.warning(
@@ -582,6 +582,12 @@ class SpeechPipelineManager:
                     f"🗣️🧠🏁 [Gen {gen_id}] LLM Worker: Generator loop finished%s (tokens: {token_count})"
                     % (" (Aborted)" if current_gen.llm_aborted else "")
                 )
+
+                # Log the complete accumulated response
+                if current_gen.quick_answer:
+                    logger.info(
+                        f"🗣️📝 [Gen {gen_id}] Complete Accumulated Response ({len(current_gen.quick_answer)} chars): \"{current_gen.quick_answer}\""
+                    )
 
                 # If loop finished naturally and no quick answer was ever found (e.g., short response)
                 # Set the whole thing as the quick answer.
@@ -621,6 +627,15 @@ class SpeechPipelineManager:
                     self.llm_answer_ready_event.set()
 
                 logger.info(f"🗣️🧠🏁 [Gen {gen_id}] LLM Worker: Finished processing cycle.")
+
+                # Log final accumulated response in finally block
+                if current_gen and current_gen.quick_answer:
+                    final_response = current_gen.quick_answer
+                    if hasattr(current_gen, "final_answer") and current_gen.final_answer:
+                        final_response = current_gen.quick_answer + current_gen.final_answer
+                    logger.info(
+                        f"🗣️📝 [Gen {gen_id}] Final Complete Response ({len(final_response)} chars): \"{final_response}\""
+                    )
 
                 current_gen.llm_finished = True
                 current_gen.llm_finished_event.set()
@@ -981,6 +996,14 @@ class SpeechPipelineManager:
                 self.stop_tts_final_finished_event.set()  # Signal that this worker's processing attempt is done
                 # logger.info(f"🗣️👄🏁 [Gen {gen_id}] Final TTS Worker: Finished processing cycle. Final answer accumulated: '{current_gen.final_answer[:50]}...'")
                 logger.info(f"🗣️👄🏁 [Gen {gen_id}] Final TTS Worker: Finished processing cycle.")
+
+                # Log the complete response (quick_answer + final_answer)
+                if current_gen:
+                    complete_response = current_gen.quick_answer + current_gen.final_answer
+                    if complete_response:
+                        logger.info(
+                            f"🗣️📝 [Gen {gen_id}] Complete Final Response ({len(complete_response)} chars): \"{complete_response}\""
+                        )
 
                 # Check if synthesis completed naturally or was stopped
                 if current_gen.audio_final_aborted or self.stop_tts_final_request_event.is_set():

@@ -417,7 +417,8 @@ class AudioProcessor:
 
         # Wait loop for completion or interruption
         wait_start = time.time()
-        chunks_received_count = 0
+        # Note: chunks_received_count is already initialized at line 279 and modified in on_audio_chunk via nonlocal
+        # Do not redefine it here as that would shadow the variable used in the nested function
         while self.stream.is_playing() or not self.finished_event.is_set():
             if stop_event.is_set():
                 self.stream.stop()
