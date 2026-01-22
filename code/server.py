@@ -583,6 +583,10 @@ async def send_tts_chunks(app: FastAPI, message_queue: asyncio.Queue, callbacks:
                 audio_final_finished = app.state.SpeechPipelineManager.running_generation.audio_final_finished
 
                 if not final_expected or audio_final_finished:
+                    # Send explicit stream end signal so client knows TTS is truly complete
+                    message_queue.put_nowait({"type": "tts_stream_end"})
+                    logger.info("🖥️🔊 Sent tts_stream_end to client")
+
                     logger.info("🖥️🏁 Sending of TTS chunks and 'user request/assistant answer' cycle finished.")
                     callbacks.send_final_assistant_answer()  # Callbacks method
 

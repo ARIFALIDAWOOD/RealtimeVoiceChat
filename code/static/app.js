@@ -877,6 +877,7 @@ let ttsWorkletNode = null;
 
 let isTTSPlaying = false;
 let ignoreIncomingTTS = false;
+let ttsStreamEndReceived = false;
 
 let chatHistory = [];
 let typingUser = "";
@@ -1005,10 +1006,13 @@ async function setupTTSPlayback() {
     } else if (type === 'ttsPlaybackStopped') {
       if (isTTSPlaying && socket && socket.readyState === WebSocket.OPEN) {
         isTTSPlaying = false;
-        console.log(
-          "TTS playback stopped. Reason: ttsWorkletNode Event ttsPlaybackStopped."
-        );
-        socket.send(JSON.stringify({ type: 'tts_stop' }));
+        if (ttsStreamEndReceived) {
+          console.log("TTS playback stopped. Buffer empty AND stream end received.");
+          socket.send(JSON.stringify({ type: 'tts_stop' }));
+          ttsStreamEndReceived = false;
+        } else {
+          console.log("TTS buffer empty, waiting for tts_stream_end from server.");
+        }
       }
     }
   };
@@ -1092,12 +1096,24 @@ function handleJSONMessage({ type, content }) {
     }
     return;
   }
+  if (type === "tts_stream_end") {
+    console.log("Received tts_stream_end from server.");
+    ttsStreamEndReceived = true;
+    // If buffer is already empty, send tts_stop now
+    if (!isTTSPlaying && socket && socket.readyState === WebSocket.OPEN) {
+      console.log("Buffer already empty, sending tts_stop now.");
+      socket.send(JSON.stringify({ type: 'tts_stop' }));
+      ttsStreamEndReceived = false;
+    }
+    return;
+  }
   if (type === "tts_interruption") {
     if (ttsWorkletNode) {
       ttsWorkletNode.port.postMessage({ type: "clear" });
     }
     isTTSPlaying = false;
     ignoreIncomingTTS = false;
+    ttsStreamEndReceived = false;
     return;
   }
   if (type === "stop_tts") {
@@ -1106,6 +1122,7 @@ function handleJSONMessage({ type, content }) {
     }
     isTTSPlaying = false;
     ignoreIncomingTTS = true;
+    ttsStreamEndReceived = false;
     console.log("TTS playback stopped. Reason: tts_interruption.");
     socket.send(JSON.stringify({ type: 'tts_stop' }));
     return;
