@@ -27,16 +27,23 @@ import struct
 import sys
 import threading  # Keep threading for SpeechPipelineManager internals and AbortWorker
 import time
+import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional  # Added for type hints in docstrings
 
 import uvicorn
+
+# Import API routes and database
+from api.routes import auth, config, health, history, sessions
 from colors import Colors
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from database import close_db, get_db_session, init_db
+from fastapi import FastAPI, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from models.session import SessionConfig, SessionState
+from services.session_manager import ActiveSession, SessionManager, session_cleanup_task
 from starlette.responses import FileResponse, HTMLResponse, Response
 from upsample_overlap import UpsampleOverlap
 
@@ -132,11 +139,18 @@ async def lifespan(app: FastAPI):
 
     Initializes global components like SpeechPipelineManager, Upsampler, and
     AudioInputProcessor and stores them in `app.state`. Handles cleanup on shutdown.
+    Also initializes the database and starts the session cleanup task.
 
     Args:
         app: The FastAPI application instance.
     """
     logger.info("🖥️▶️ Server starting up")
+
+    # Initialize database
+    logger.info("🖥️💾 Initializing database...")
+    await init_db()
+    logger.info("🖥️💾 Database initialized successfully")
+
     # Initialize global components, not connection-specific state
     app.state.SpeechPipelineManager = SpeechPipelineManager(
         tts_engine=TTS_START_ENGINE,
@@ -154,16 +168,43 @@ async def lifespan(app: FastAPI):
     )
     app.state.Aborting = False  # Keep this? Its usage isn't clear in the provided snippet. Minimizing changes.
 
+    # Store active sessions for WebSocket connections (session_id -> ActiveSession)
+    app.state.active_sessions: Dict[str, ActiveSession] = {}
+
+    # Start session cleanup background task
+    from database import get_session_factory
+
+    cleanup_task = asyncio.create_task(session_cleanup_task(get_session_factory()))
+    logger.info("🖥️🧹 Session cleanup task started")
+
     yield
 
     logger.info("🖥️⏹️ Server shutting down")
+
+    # Cancel cleanup task
+    cleanup_task.cancel()
+    try:
+        await cleanup_task
+    except asyncio.CancelledError:
+        pass
+
+    # Shutdown audio processor
     app.state.AudioInputProcessor.shutdown()
+
+    # Close database connection
+    await close_db()
+    logger.info("🖥️💾 Database connection closed")
 
 
 # --------------------------------------------------------------------
 # FastAPI app instance
 # --------------------------------------------------------------------
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(
+    title="RealtimeVoiceChat API",
+    description="Real-time voice chat API with session management, authentication, and multi-client support",
+    version="1.0.0",
+    lifespan=lifespan,
+)
 
 # Enable CORS if needed
 app.add_middleware(
@@ -173,6 +214,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# --------------------------------------------------------------------
+# Include API routes under /api/v1/
+# --------------------------------------------------------------------
+API_PREFIX = "/api/v1"
+app.include_router(auth.router, prefix=API_PREFIX)
+app.include_router(sessions.router, prefix=API_PREFIX)
+app.include_router(history.router, prefix=API_PREFIX)
+app.include_router(config.router, prefix=API_PREFIX)
+app.include_router(health.router, prefix=API_PREFIX)
 
 # Mount static files with no cache
 static_dir = Path(__file__).parent / "static"
@@ -600,6 +651,9 @@ class TranscriptionCallbacks:
         self.abort_text = ""
         self.last_abort_text = ""
 
+        # Session identifier for this connection (set by WebSocket endpoint)
+        self.session_id: Optional[str] = None
+
         # Initialize connection-specific state flags here
         self.tts_to_client: bool = False
         self.user_interrupted: bool = False
@@ -921,12 +975,19 @@ class TranscriptionCallbacks:
 
 
 # --------------------------------------------------------------------
-# Main WebSocket endpoint
+# Main WebSocket endpoint (Session-Aware)
 # --------------------------------------------------------------------
 @app.websocket("/ws")
-async def websocket_endpoint(ws: WebSocket):
+async def websocket_endpoint(
+    ws: WebSocket,
+    session_id: Optional[str] = Query(default=None, description="Session ID for existing session"),
+):
     """
     Handles the main WebSocket connection for real-time voice chat.
+
+    Supports two connection modes:
+    1. With session_id query param: Connect to existing session (requires valid session)
+    2. Without session_id: Create ephemeral session (backward compatible)
 
     Accepts a connection, sets up connection-specific state via `TranscriptionCallbacks`,
     initializes audio/message queues, and creates asyncio tasks for handling
@@ -935,15 +996,59 @@ async def websocket_endpoint(ws: WebSocket):
 
     Args:
         ws: The WebSocket connection instance provided by FastAPI.
+        session_id: Optional session ID for connecting to an existing session.
     """
     await ws.accept()
-    logger.info("🖥️✅ Client connected via WebSocket.")
+
+    # Handle session management
+    active_session: Optional[ActiveSession] = None
+    is_ephemeral = session_id is None
+
+    if session_id:
+        # Connect to existing session
+        logger.info(f"🖥️🔗 Client connecting to session: {session_id}")
+        async with get_db_session() as db:
+            session_manager = SessionManager(db)
+            active_session = await session_manager.connect_websocket(session_id)
+
+        if active_session is None:
+            logger.warning(f"🖥️⚠️ Session not found or expired: {session_id}")
+            await ws.send_json(
+                {
+                    "type": "error",
+                    "content": "Session not found or expired",
+                    "session_id": session_id,
+                }
+            )
+            await ws.close(code=4004, reason="Session not found")
+            return
+
+        logger.info(f"🖥️✅ Connected to existing session: {session_id}")
+    else:
+        # Create ephemeral session for backward compatibility
+        session_id = str(uuid.uuid4())
+        default_config = SessionConfig()
+        active_session = ActiveSession(session_id, default_config)
+        app.state.active_sessions[session_id] = active_session
+        logger.info(f"🖥️✅ Created ephemeral session: {session_id}")
+
+    # Send session info to client
+    await ws.send_json(
+        {
+            "type": "session_info",
+            "session_id": session_id,
+            "config": active_session.config.to_dict(),
+            "state": "active",
+            "ephemeral": is_ephemeral,
+        }
+    )
 
     message_queue = asyncio.Queue()
     audio_chunks = asyncio.Queue()
 
     # Set up callback manager - THIS NOW HOLDS THE CONNECTION-SPECIFIC STATE
     callbacks = TranscriptionCallbacks(app, message_queue)
+    callbacks.session_id = session_id  # Add session_id to callbacks for message tagging
 
     # Assign callbacks to the AudioInputProcessor (global component)
     # These methods within callbacks will now operate on its *instance* state
@@ -959,6 +1064,11 @@ async def websocket_endpoint(ws: WebSocket):
 
     # Assign callback to the SpeechPipelineManager (global component)
     app.state.SpeechPipelineManager.on_partial_assistant_text = callbacks.on_partial_assistant_text
+
+    # Load history from active session into pipeline manager (if exists)
+    if active_session and active_session.history:
+        app.state.SpeechPipelineManager.history = list(active_session.history)
+        logger.info(f"🖥️📜 Loaded {len(active_session.history)} messages from session history")
 
     # Create tasks for handling different responsibilities
     # Pass the 'callbacks' instance to tasks that need connection-specific state
@@ -987,7 +1097,26 @@ async def websocket_endpoint(ws: WebSocket):
         # Ensure all tasks are awaited after cancellation
         # Use return_exceptions=True to prevent gather from stopping on first error during cleanup
         await asyncio.gather(*tasks, return_exceptions=True)
-        logger.info("🖥️❌ WebSocket session ended.")
+
+        # Update session state on disconnect
+        if session_id and not is_ephemeral:
+            async with get_db_session() as db:
+                session_manager = SessionManager(db)
+                await session_manager.disconnect_websocket(session_id)
+                # Sync history back to database
+                if active_session:
+                    history_to_sync = app.state.SpeechPipelineManager.history
+                    if history_to_sync:
+                        await session_manager.replace_history(
+                            session_id,
+                            history_to_sync,
+                        )
+                        logger.info(f"🖥️💾 Synced {len(history_to_sync)} messages to session")
+        elif is_ephemeral and session_id in app.state.active_sessions:
+            del app.state.active_sessions[session_id]
+            logger.info(f"🖥️🗑️ Cleaned up ephemeral session: {session_id}")
+
+        logger.info(f"🖥️❌ WebSocket session ended: {session_id}")
 
 
 # --------------------------------------------------------------------

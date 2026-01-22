@@ -5,8 +5,9 @@ import os
 import sys
 import threading
 import time
+from dataclasses import dataclass
 from queue import Empty, Queue
-from typing import Callable, Optional, Dict, Any
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional
 
 # (Make sure real/mock imports are correct)
 from audio_module import AudioProcessor
@@ -18,11 +19,70 @@ from text_similarity import TextSimilarity
 # (Logging setup)
 logger = logging.getLogger(__name__)
 
+
+@dataclass
+class PipelineConfig:
+    """
+    Configuration for SpeechPipelineManager.
+
+    Can be created from a SessionConfig for session-based initialization.
+
+    Attributes:
+        tts_engine: TTS engine name (kokoro, coqui, orpheus)
+        llm_provider: LLM provider (openai, ollama, lmstudio)
+        llm_model: LLM model identifier
+        persona: Persona name from system_prompts.json
+        verbosity: Verbosity level (brief, normal, detailed)
+        no_think: Whether to strip thinking tags
+        orpheus_model: Orpheus model path (if using orpheus TTS)
+    """
+
+    tts_engine: str = "kokoro"
+    llm_provider: str = "openai"
+    llm_model: str = "gpt-4o-mini"
+    persona: str = "default"
+    verbosity: str = "normal"
+    no_think: bool = False
+    orpheus_model: str = "orpheus-3b-0.1-ft-Q8_0-GGUF/orpheus-3b-0.1-ft-q8_0.gguf"
+
+    @classmethod
+    def from_session_config(cls, session_config) -> "PipelineConfig":
+        """
+        Create a PipelineConfig from a SessionConfig object.
+
+        Args:
+            session_config: A SessionConfig instance from models.session
+
+        Returns:
+            PipelineConfig with values from the session config
+        """
+        return cls(
+            tts_engine=session_config.tts_engine,
+            llm_provider=session_config.llm_provider,
+            llm_model=session_config.llm_model,
+            persona=session_config.persona,
+            verbosity=session_config.verbosity,
+            no_think=session_config.no_think,
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary."""
+        return {
+            "tts_engine": self.tts_engine,
+            "llm_provider": self.llm_provider,
+            "llm_model": self.llm_model,
+            "persona": self.persona,
+            "verbosity": self.verbosity,
+            "no_think": self.no_think,
+            "orpheus_model": self.orpheus_model,
+        }
+
+
 # (Load system prompts config)
 def load_system_prompts_config() -> Dict[str, Any]:
     """
     Loads system prompts configuration from JSON file.
-    
+
     Returns:
         Dictionary containing personas and verbosity_levels, or default config if file not found.
     """
@@ -35,35 +95,16 @@ def load_system_prompts_config() -> Dict[str, Any]:
         logger.warning("🗣️📄 system_prompts.json not found. Using default config.")
         # Return minimal default config
         return {
-            "personas": {
-                "default": {
-                    "name": "Default",
-                    "base_prompt": "You are a helpful assistant."
-                }
-            },
-            "verbosity_levels": {
-                "normal": {
-                    "name": "Normal",
-                    "instruction": "Provide balanced responses."
-                }
-            }
+            "personas": {"default": {"name": "Default", "base_prompt": "You are a helpful assistant."}},
+            "verbosity_levels": {"normal": {"name": "Normal", "instruction": "Provide balanced responses."}},
         }
     except json.JSONDecodeError as e:
         logger.error(f"🗣️💥 Error parsing system_prompts.json: {e}. Using default config.")
         return {
-            "personas": {
-                "default": {
-                    "name": "Default",
-                    "base_prompt": "You are a helpful assistant."
-                }
-            },
-            "verbosity_levels": {
-                "normal": {
-                    "name": "Normal",
-                    "instruction": "Provide balanced responses."
-                }
-            }
+            "personas": {"default": {"name": "Default", "base_prompt": "You are a helpful assistant."}},
+            "verbosity_levels": {"normal": {"name": "Normal", "instruction": "Provide balanced responses."}},
         }
+
 
 SYSTEM_PROMPTS_CONFIG = load_system_prompts_config()
 
@@ -197,7 +238,7 @@ class SpeechPipelineManager:
         self.current_persona = "default"
         self.current_verbosity = "normal"
         self.system_prompts_config = SYSTEM_PROMPTS_CONFIG
-        
+
         # Build initial system prompt
         self.system_prompt = self._build_system_prompt(self.current_persona, self.current_verbosity)
         if tts_engine == "orpheus":
@@ -298,11 +339,11 @@ class SpeechPipelineManager:
     def _build_system_prompt(self, persona: str, verbosity: str) -> str:
         """
         Builds a system prompt by combining persona base prompt and verbosity instruction.
-        
+
         Args:
             persona: The persona key (e.g., "default", "math_teacher")
             verbosity: The verbosity level key (e.g., "brief", "normal", "detailed")
-            
+
         Returns:
             Combined system prompt string.
         """
@@ -310,24 +351,24 @@ class SpeechPipelineManager:
         personas = self.system_prompts_config.get("personas", {})
         persona_config = personas.get(persona, personas.get("default", {}))
         base_prompt = persona_config.get("base_prompt", "You are a helpful assistant.")
-        
+
         # Get verbosity instruction
         verbosity_levels = self.system_prompts_config.get("verbosity_levels", {})
         verbosity_config = verbosity_levels.get(verbosity, verbosity_levels.get("normal", {}))
         verbosity_instruction = verbosity_config.get("instruction", "")
-        
+
         # Combine them
         if verbosity_instruction:
             combined_prompt = f"{base_prompt}\n\n**Response Style:**\n{verbosity_instruction}"
         else:
             combined_prompt = base_prompt
-            
+
         return combined_prompt
 
     def update_system_prompt(self, persona: str, verbosity: str):
         """
         Updates the system prompt dynamically by changing persona and/or verbosity.
-        
+
         Args:
             persona: The persona key to use (e.g., "default", "math_teacher")
             verbosity: The verbosity level key (e.g., "brief", "normal", "detailed")
@@ -335,40 +376,162 @@ class SpeechPipelineManager:
         # Validate persona and verbosity exist in config
         personas = self.system_prompts_config.get("personas", {})
         verbosity_levels = self.system_prompts_config.get("verbosity_levels", {})
-        
+
         if persona not in personas:
             logger.warning(f"🗣️⚠️ Unknown persona '{persona}', using 'default'")
             persona = "default"
-            
+
         if verbosity not in verbosity_levels:
             logger.warning(f"🗣️⚠️ Unknown verbosity '{verbosity}', using 'normal'")
             verbosity = "normal"
-        
+
         # Update current settings
         self.current_persona = persona
         self.current_verbosity = verbosity
-        
+
         # Build new system prompt
         new_prompt = self._build_system_prompt(persona, verbosity)
-        
+
         # Add orpheus addon if needed
         if self.tts_engine == "orpheus":
             new_prompt += f"\n{orpheus_prompt_addon}"
-        
+
         # Update the system prompt
         self.system_prompt = new_prompt
-        
+
         # Update the LLM's system prompt
         self.llm.update_system_prompt(new_prompt)
-        
+
         # Abort any ongoing generation to ensure new persona takes effect immediately
         if self.is_valid_gen():
             logger.info(f"🗣️🛑 Aborting ongoing generation to apply new persona/verbosity settings")
             self.abort_generation(wait_for_completion=False, timeout=2.0, reason="System prompt update")
-        
+
         persona_name = personas.get(persona, {}).get("name", persona)
         verbosity_name = verbosity_levels.get(verbosity, {}).get("name", verbosity)
         logger.info(f"🗣️📝 System prompt updated: Persona='{persona_name}', Verbosity='{verbosity_name}'")
+
+    def update_llm_config(self, provider: Optional[str] = None, model: Optional[str] = None) -> bool:
+        """
+        Updates the LLM provider and/or model at runtime.
+
+        This method allows hot-swapping the LLM backend without restarting the server.
+        Any ongoing generation will be aborted before switching.
+
+        Args:
+            provider: New LLM provider (openai, ollama, lmstudio). None to keep current.
+            model: New LLM model identifier. None to keep current.
+
+        Returns:
+            True if update was successful, False otherwise.
+        """
+        # Validate inputs
+        if provider is None and model is None:
+            logger.warning("🗣️⚠️ update_llm_config called with no changes")
+            return True
+
+        new_provider = provider if provider is not None else self.llm_provider
+        new_model = model if model is not None else self.llm_model
+
+        # Check if anything actually changed
+        if new_provider == self.llm_provider and new_model == self.llm_model:
+            logger.info("🗣️ℹ️ LLM config unchanged")
+            return True
+
+        logger.info(f"🗣️🔄 Updating LLM config: {self.llm_provider}/{self.llm_model} -> {new_provider}/{new_model}")
+
+        # Abort any ongoing generation
+        if self.is_valid_gen():
+            logger.info("🗣️🛑 Aborting ongoing generation for LLM config change")
+            self.abort_generation(wait_for_completion=True, timeout=5.0, reason="LLM config update")
+
+        try:
+            # Get base URL for OpenAI-compatible backends
+            base_url = None
+            if new_provider == "openai":
+                base_url = os.getenv("OPENAI_BASE_URL")
+            elif new_provider == "lmstudio":
+                base_url = os.getenv("LMSTUDIO_BASE_URL", "http://127.0.0.1:1234/v1")
+
+            # Create new LLM instance
+            new_llm = LLM(
+                backend=new_provider,
+                model=new_model,
+                system_prompt=self.system_prompt,
+                no_think=self.no_think,
+                base_url=base_url,
+            )
+
+            # Test connection
+            new_llm.prewarm()
+
+            # Replace old LLM
+            old_llm = self.llm
+            self.llm = new_llm
+            self.llm_provider = new_provider
+            self.llm_model = new_model
+
+            # Cleanup old LLM if needed
+            if hasattr(old_llm, "cancel_generation"):
+                old_llm.cancel_generation()
+
+            # Measure new inference time
+            try:
+                self.llm_inference_time = self.llm.measure_inference_time()
+                if self.llm_inference_time is None:
+                    self.llm_inference_time = 0.0
+            except Exception:
+                self.llm_inference_time = 0.0
+
+            self.full_output_pipeline_latency = self.llm_inference_time + self.audio.tts_inference_time
+            logger.info(f"🗣️✅ LLM updated successfully. New latency: {self.full_output_pipeline_latency:.2f}ms")
+            return True
+
+        except Exception as e:
+            logger.error(f"🗣️💥 Failed to update LLM config: {e}", exc_info=True)
+            return False
+
+    def get_config(self) -> PipelineConfig:
+        """
+        Returns the current pipeline configuration.
+
+        Returns:
+            PipelineConfig with current settings.
+        """
+        return PipelineConfig(
+            tts_engine=self.tts_engine,
+            llm_provider=self.llm_provider,
+            llm_model=self.llm_model,
+            persona=self.current_persona,
+            verbosity=self.current_verbosity,
+            no_think=self.no_think,
+            orpheus_model=self.orpheus_model,
+        )
+
+    @classmethod
+    def from_config(
+        cls,
+        config: PipelineConfig,
+    ) -> "SpeechPipelineManager":
+        """
+        Factory method to create a SpeechPipelineManager from a PipelineConfig.
+
+        Args:
+            config: PipelineConfig with desired settings.
+
+        Returns:
+            New SpeechPipelineManager instance.
+        """
+        instance = cls(
+            tts_engine=config.tts_engine,
+            llm_provider=config.llm_provider,
+            llm_model=config.llm_model,
+            no_think=config.no_think,
+            orpheus_model=config.orpheus_model,
+        )
+        # Apply persona and verbosity
+        instance.update_system_prompt(config.persona, config.verbosity)
+        return instance
 
     def is_valid_gen(self) -> bool:
         """
@@ -586,7 +749,7 @@ class SpeechPipelineManager:
                 # Log the complete accumulated response
                 if current_gen.quick_answer:
                     logger.info(
-                        f"🗣️📝 [Gen {gen_id}] Complete Accumulated Response ({len(current_gen.quick_answer)} chars): \"{current_gen.quick_answer}\""
+                        f'🗣️📝 [Gen {gen_id}] Complete Accumulated Response ({len(current_gen.quick_answer)} chars): "{current_gen.quick_answer}"'
                     )
 
                 # If loop finished naturally and no quick answer was ever found (e.g., short response)
@@ -634,7 +797,7 @@ class SpeechPipelineManager:
                     if hasattr(current_gen, "final_answer") and current_gen.final_answer:
                         final_response = current_gen.quick_answer + current_gen.final_answer
                     logger.info(
-                        f"🗣️📝 [Gen {gen_id}] Final Complete Response ({len(final_response)} chars): \"{final_response}\""
+                        f'🗣️📝 [Gen {gen_id}] Final Complete Response ({len(final_response)} chars): "{final_response}"'
                     )
 
                 current_gen.llm_finished = True
@@ -1002,7 +1165,7 @@ class SpeechPipelineManager:
                     complete_response = current_gen.quick_answer + current_gen.final_answer
                     if complete_response:
                         logger.info(
-                            f"🗣️📝 [Gen {gen_id}] Complete Final Response ({len(complete_response)} chars): \"{complete_response}\""
+                            f'🗣️📝 [Gen {gen_id}] Complete Final Response ({len(complete_response)} chars): "{complete_response}"'
                         )
 
                 # Check if synthesis completed naturally or was stopped
