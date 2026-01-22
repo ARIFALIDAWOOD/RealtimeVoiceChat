@@ -6,7 +6,7 @@ import threading
 import time
 from collections import namedtuple
 from queue import Queue
-from typing import Callable, Generator, Optional
+from typing import Any, Callable, Dict, Generator, Optional
 
 import numpy as np
 from huggingface_hub import hf_hub_download
@@ -229,6 +229,85 @@ class AudioProcessor:
         """
         logger.info("👄🛑 Audio stream stopped.")
         self.finished_event.set()
+
+    def set_voice(self, voice: str) -> bool:
+        """
+        Changes the TTS voice at runtime.
+
+        Args:
+            voice: Voice identifier (engine-specific).
+                   For Kokoro: af_heart, af_bella, am_adam, etc.
+                   For Orpheus: tara, dan, josh, emma
+
+        Returns:
+            True if voice was changed successfully, False otherwise.
+        """
+        try:
+            if self.engine_name == "kokoro":
+                if hasattr(self.engine, "set_voice"):
+                    self.engine.set_voice(voice)
+                    logger.info(f"👄🔊 Kokoro voice changed to: {voice}")
+                    return True
+                else:
+                    logger.warning("👄⚠️ Kokoro engine doesn't support set_voice")
+                    return False
+
+            elif self.engine_name == "orpheus":
+                from RealtimeTTS import OrpheusVoice
+
+                orpheus_voice = OrpheusVoice(voice)
+                self.engine.set_voice(orpheus_voice)
+                logger.info(f"👄🔊 Orpheus voice changed to: {voice}")
+                return True
+
+            elif self.engine_name == "coqui":
+                # Coqui uses reference audio, can't easily change voice
+                logger.warning("👄⚠️ Coqui engine voice change not supported at runtime")
+                return False
+
+            else:
+                logger.warning(f"👄⚠️ Unknown engine: {self.engine_name}")
+                return False
+
+        except Exception as e:
+            logger.error(f"👄💥 Failed to change voice: {e}", exc_info=True)
+            return False
+
+    def get_current_voice(self) -> Optional[str]:
+        """
+        Gets the current voice identifier if available.
+
+        Returns:
+            Current voice name or None if not available.
+        """
+        try:
+            if self.engine_name == "kokoro" and hasattr(self.engine, "voice"):
+                return self.engine.voice
+            elif self.engine_name == "orpheus" and hasattr(self.engine, "voice"):
+                return str(self.engine.voice)
+            elif self.engine_name == "coqui":
+                return "reference_audio"
+        except Exception:
+            pass
+        return None
+
+    def get_engine_info(self) -> Dict[str, Any]:
+        """
+        Returns information about the current TTS engine.
+
+        Returns:
+            Dictionary with engine name, voice, and other metadata.
+        """
+        return {
+            "engine": self.engine_name,
+            "voice": self.get_current_voice(),
+            "tts_inference_time_ms": self.tts_inference_time,
+            "silence_config": {
+                "comma": self.silence.comma,
+                "sentence": self.silence.sentence,
+                "default": self.silence.default,
+            },
+        }
 
     def synthesize(
         self,
