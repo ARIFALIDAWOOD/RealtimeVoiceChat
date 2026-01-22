@@ -71,3 +71,6 @@ logs/
 # OS
 Thumbs.db
 .DS_Store
+
+*.wav
+*.db

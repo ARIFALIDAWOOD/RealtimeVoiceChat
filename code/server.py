@@ -597,7 +597,7 @@ async def send_tts_chunks(app: FastAPI, message_queue: asyncio.Queue, callbacks:
                     app.state.SpeechPipelineManager.running_generation = None
 
                     callbacks.tts_chunk_sent = False  # Reset via callbacks
-                    callbacks.reset_state()  # Reset connection state via callbacks
+                    callbacks.reset_state(skip_abort=True)  # Reset state without aborting (normal completion)
 
                 await asyncio.sleep(0.001)
                 log_status()
@@ -684,8 +684,13 @@ class TranscriptionCallbacks:
         self.abort_worker_thread = threading.Thread(target=self._abort_worker, name="AbortWorker", daemon=True)
         self.abort_worker_thread.start()
 
-    def reset_state(self):
-        """Resets connection-specific state flags and variables to their initial values."""
+    def reset_state(self, skip_abort: bool = False):
+        """Resets connection-specific state flags and variables to their initial values.
+
+        Args:
+            skip_abort: If True, skips calling abort_generation(). Use this when
+                        generation completed normally and abort is not needed.
+        """
         # Reset all connection-specific state flags
         self.tts_to_client = False
         self.user_interrupted = False
@@ -706,8 +711,9 @@ class TranscriptionCallbacks:
         self.final_assistant_answer_sent = False
         self.partial_transcription = ""
 
-        # Keep the abort call related to the audio processor/pipeline manager
-        self.app.state.AudioInputProcessor.abort_generation()
+        # Only abort if explicitly needed (not on normal completion)
+        if not skip_abort:
+            self.app.state.AudioInputProcessor.abort_generation()
 
     def _abort_worker(self):
         """Background thread worker to check for abort conditions based on partial text."""
